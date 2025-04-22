@@ -39,6 +39,7 @@ public class QuestionProcessor implements CsvProcessor {
             }
         }
         question4();
+        question5();
     }
 
     public void question3() {
@@ -212,6 +213,58 @@ public class QuestionProcessor implements CsvProcessor {
             System.out.println("MO_BS_AP row not found or no valid numeric data in any file.");
         }
     }
+
+    public void question5() {
+        double globalSum = 0;
+        int globalCount = 0;
+
+        List<String> zipKeys = s3Service.listAllZipKeysInFolder("company-data");
+
+        for (String key : zipKeys) {
+            File zipFile = s3Service.downloadCSV(key);
+            Map<String, File> extractedFiles = zipExtractor.extract(zipFile);
+
+            for (Map.Entry<String, File> entry : extractedFiles.entrySet()) {
+                File csvFile = entry.getValue();
+
+                try (Stream<String> lines = Files.lines(csvFile.toPath(), StandardCharsets.UTF_8)) {
+                    Optional<double[]> result = lines
+                            .skip(1)
+                            .map(line -> line.split(","))
+                            .filter(parts -> parts.length > 2 && "MO_BS_NCI".equals(parts[0].trim()))
+                            .map(parts -> {
+                                double sum = 0;
+                                int count = 0;
+                                for (int i = 2; i < parts.length; i++) {
+                                    try {
+                                        sum += Double.parseDouble(parts[i].trim());
+                                        count++;
+                                    } catch (NumberFormatException ignored) {}
+                                }
+                                return new double[]{sum, count};
+                            })
+                            .findFirst();
+
+                    if (result.isPresent()) {
+                        globalSum += result.get()[0];
+                        globalCount += result.get()[1];
+                    }
+
+                } catch (IOException e) {
+                    System.err.printf("Failed to process %s: %s%n", entry.getKey(), e.getMessage());
+                    e.printStackTrace();
+                }
+            }
+        }
+
+        if (globalCount > 0) {
+            double overallMean = globalSum / globalCount;
+            System.out.printf("Question 5: Overall mean of MO_BS_NCI: %.2f%n", overallMean);
+        } else {
+            System.out.println("MO_BS_AP row not found or no valid numeric data in any file.");
+        }
+    }
+
 
     @Override
     public String name() {
