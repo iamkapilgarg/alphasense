@@ -10,17 +10,16 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.util.*;
-import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 @Order(1)
 @Component
-public class Question1Processor implements CsvProcessor {
+public class QuestionProcessor implements CsvProcessor {
 
     private final S3Service s3Service;
     private final ZipExtractor zipExtractor;
 
-    public Question1Processor(S3Service s3Service, ZipExtractor zipExtractor) {
+    public QuestionProcessor(S3Service s3Service, ZipExtractor zipExtractor) {
         this.s3Service = s3Service;
         this.zipExtractor = zipExtractor;
     }

@@ -1,8 +1,6 @@
 package com.kapil.csvstreamer.runner;
 
 import com.kapil.csvstreamer.processor.CsvProcessor;
-import com.kapil.csvstreamer.processor.Question1Processor;
-import com.kapil.csvstreamer.util.FileUtils;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.stereotype.Component;
 
