@@ -1,16 +1,15 @@
 package com.kapil.csvstreamer.processor;
 
-import com.kapil.csvstreamer.model.Transaction;
 import com.kapil.csvstreamer.service.S3Service;
 import com.kapil.csvstreamer.service.ZipExtractor;
 import org.springframework.core.annotation.Order;
 import org.springframework.stereotype.Component;
 
-import java.io.*;
+import java.io.File;
+import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
-import java.util.Map;
-import java.util.Objects;
+import java.util.*;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -28,65 +27,197 @@ public class Question1Processor implements CsvProcessor {
 
     @Override
     public void process() {
-        File zipFile = s3Service.downloadZip("transaction.zip");
+        List<String> zipKeys = s3Service.listAllZipKeysInFolder("company-data/");
+        for (String key : zipKeys) {
+            if (key.equals("company-data/MNZIRS0108.zip")) {
+                question1();
+            }
+            if (key.equals("company-data/Y1HZ7B0146.zip")) {
+                question2();
+            }
+            if (key.equals("company-data/U07N2S0124.zip")) {
+                question3();
+            }
+        }
+        question4();
+    }
+
+    public void question3() {
+        File zipFile = s3Service.downloadCSV("company-data/U07N2S0124.zip");
         Map<String, File> extractedFiles = zipExtractor.extract(zipFile);
 
-        File csvFile = extractedFiles.get("transaction.csv");
+        File csvFile = extractedFiles.get("u07n2s0124.csv");
         if (csvFile == null) {
-            System.err.println("transactions.csv not found for question1");
+            System.err.println("csv not found for question1");
             return;
         }
 
         try (Stream<String> lines = Files.lines(csvFile.toPath(), StandardCharsets.UTF_8)) {
-            Map<String, Double> accountTotals = lines
-                    .skip(1) // Skip header
-                    .map(this::parseTransaction)
-                    .filter(Objects::nonNull)
-                    .filter(t -> t.getAccountId() != null && !t.getAccountId().trim().isEmpty())
-                    .filter(t -> isNumeric(t.getAmount()))
-                    .collect(Collectors.groupingBy(
-                            Transaction::getAccountId,
-                            Collectors.summingDouble(t -> Double.parseDouble(t.getAmount()))
-                    ));
+            List<String> allLines = lines.toList();
 
-            System.out.println("[Q1] ✅ Account Totals:");
-            accountTotals.forEach((account, total) ->
-                    System.out.printf("Account %s: %.2f%n", account, total));
+            String[] header = allLines.get(0).split(",");
+            int targetColumnIndex = -1;
+
+            for (int i = 0; i < header.length; i++) {
+                if ("2015-09-30".equals(header[i].trim())) {
+                    targetColumnIndex = i;
+                    break;
+                }
+            }
+            if (targetColumnIndex == -1) {
+                System.out.println("Question 3: Column not found: 2015-09-30");
+                return;
+            }
+
+            for (int i = 1; i < allLines.size(); i++) {
+                String[] parts = allLines.get(i).split(",");
+                System.out.println(parts.toString());
+                if ("MO_BS_Intangibles".equals(parts[0].trim())) {
+                    System.out.println("Question 3: MO_BS_Intangibles 2015-09-30 Value " + parts[targetColumnIndex]);
+                    break;
+                }
+            }
 
         } catch (IOException e) {
-            System.err.println("❌ Failed to process CSV file: " + e.getMessage());
+            System.err.println("Failed to process CSV file: " + e.getMessage());
             e.printStackTrace();
         }
     }
 
-    private Transaction parseTransaction(String line) {
-        try {
-            String[] parts = line.split(",", -1);
-            if (parts.length < 3) return null;
+    public void question2() {
+        File zipFile = s3Service.downloadCSV("company-data/Y1HZ7B0146.zip");
+        Map<String, File> extractedFiles = zipExtractor.extract(zipFile);
 
-            String txnId = parts[0].trim();       // optional
-            String accountId = parts[1].trim();   // used for grouping
-            String amount = parts[2].trim();      // needs parsing
-            String region = parts.length > 3 ? parts[3].trim() : null;
+        File csvFile = extractedFiles.get("y1hz7b0146.csv");
+        if (csvFile == null) {
+            System.err.println("csv not found for question1");
+            return;
+        }
 
-            return new Transaction(txnId, accountId, amount, region);
-        } catch (Exception e) {
-            System.err.println("Skipping malformed line: " + line);
-            return null;
+        try (Stream<String> lines = Files.lines(csvFile.toPath(), StandardCharsets.UTF_8)) {
+            OptionalDouble mean = lines
+                    .skip(1) // skip header
+                    .map(line -> line.split(","))
+                    .filter(parts -> parts.length > 2 && "MO_BS_AP".equals(parts[0].trim()))
+                    .flatMapToDouble(parts -> {
+                        return java.util.stream.IntStream.range(2, parts.length)
+                                .mapToDouble(i -> {
+                                    try {
+                                        return Double.parseDouble(parts[i].trim());
+                                    } catch (NumberFormatException e) {
+                                        return Double.NaN;
+                                    }
+                                });
+                    })
+                    .filter(d -> !Double.isNaN(d))
+                    .average();
+
+            if (mean.isPresent()) {
+                System.out.printf("Question 2: Mean of row MO_BS_AP: %.2f%n", mean.getAsDouble());
+            } else {
+                System.out.println("Could not calculate mean (row not found or no numeric values)");
+            }
+
+        } catch (IOException e) {
+            System.err.println("Failed to process CSV file: " + e.getMessage());
+            e.printStackTrace();
         }
     }
 
-    private boolean isNumeric(String str) {
-        try {
-            Double.parseDouble(str);
-            return true;
-        } catch (NumberFormatException ex) {
-            return false;
+    public void question1() {
+        {
+            File zipFile = s3Service.downloadCSV("company-data/MNZIRS0108.zip");
+            Map<String, File> extractedFiles = zipExtractor.extract(zipFile);
+
+            File csvFile = extractedFiles.get("mnzirs0108.csv");
+            if (csvFile == null) {
+                System.err.println("transactions.csv not found for question1");
+                return;
+            }
+
+            try (Stream<String> lines = Files.lines(csvFile.toPath(), StandardCharsets.UTF_8)) {
+                List<String> allLines = lines.toList();
+
+                String[] header = allLines.get(0).split(",");
+                int targetColumnIndex = -1;
+
+                for (int i = 0; i < header.length; i++) {
+                    if ("2014-10-01".equals(header[i].trim())) {
+                        targetColumnIndex = i;
+                        break;
+                    }
+                }
+
+                for (int i = 1; i < allLines.size(); i++) {
+                    String[] parts = allLines.get(i).split(",");
+                    if ("MO_BS_INV".equals(parts[0].trim())) {
+                        System.out.println("Question 1: MO_BS_INV 2014-10-01 Value " + parts[targetColumnIndex]);
+                        break;
+                    }
+                }
+
+            } catch (IOException e) {
+                System.err.println("Failed to process CSV file: " + e.getMessage());
+                e.printStackTrace();
+            }
+        }
+    }
+
+    public void question4() {
+        double globalSum = 0;
+        int globalCount = 0;
+
+        List<String> zipKeys = s3Service.listAllZipKeysInFolder("company-data");
+
+        for (String key : zipKeys) {
+            File zipFile = s3Service.downloadCSV(key);
+            Map<String, File> extractedFiles = zipExtractor.extract(zipFile);
+
+            for (Map.Entry<String, File> entry : extractedFiles.entrySet()) {
+                File csvFile = entry.getValue();
+
+                try (Stream<String> lines = Files.lines(csvFile.toPath(), StandardCharsets.UTF_8)) {
+                    Optional<double[]> result = lines
+                            .skip(1)
+                            .map(line -> line.split(","))
+                            .filter(parts -> parts.length > 2 && "MO_BS_AP".equals(parts[0].trim()))
+                            .map(parts -> {
+                                double sum = 0;
+                                int count = 0;
+                                for (int i = 2; i < parts.length; i++) {
+                                    try {
+                                        sum += Double.parseDouble(parts[i].trim());
+                                        count++;
+                                    } catch (NumberFormatException ignored) {}
+                                }
+                                return new double[]{sum, count};
+                            })
+                            .findFirst();
+
+                    if (result.isPresent()) {
+                        globalSum += result.get()[0];
+                        globalCount += result.get()[1];
+                    }
+
+                } catch (IOException e) {
+                    System.err.printf("Failed to process %s: %s%n", entry.getKey(), e.getMessage());
+                    e.printStackTrace();
+                }
+            }
+        }
+
+        if (globalCount > 0) {
+            double overallMean = globalSum / globalCount;
+            System.out.printf("Question 4: Overall mean of MO_BS_AP: %.2f%n", overallMean);
+        } else {
+            System.out.println("MO_BS_AP row not found or no valid numeric data in any file.");
         }
     }
 
     @Override
     public String name() {
-        return "question1";
+        return "question 1";
     }
+
+
 }

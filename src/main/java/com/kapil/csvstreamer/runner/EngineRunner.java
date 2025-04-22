@@ -1,6 +1,7 @@
 package com.kapil.csvstreamer.runner;
 
 import com.kapil.csvstreamer.processor.CsvProcessor;
+import com.kapil.csvstreamer.processor.Question1Processor;
 import com.kapil.csvstreamer.util.FileUtils;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.stereotype.Component;
@@ -20,11 +21,11 @@ public class EngineRunner implements CommandLineRunner {
     public void run(String... args) throws Exception {
         for (CsvProcessor processor : processors) {
             System.out.println("\n==> Running: " + processor.name());
-            FileUtils.logMemoryUsage();
+            //FileUtils.logMemoryUsage();
             processor.process();
-            FileUtils.logMemoryUsage();
+            //FileUtils.logMemoryUsage();
         }
 
-        FileUtils.cleanupTempFiles();
+        //FileUtils.cleanupTempFiles();
     }
 }
